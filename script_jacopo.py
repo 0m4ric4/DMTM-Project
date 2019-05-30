@@ -15,14 +15,15 @@ def print_info_about_dataset(dt,name):
 def check_missing_values(dt):
     print(dt.isnull().sum())
 
-def set_km_start(event):
-    if (event['KM_START'] >= event['KM_END']):
+
+def check_start_end_km(event):
+    if (event['KM_START'] <= event['KM_END']):
         kmstart = event['KM_START']
         kmend = event['KM_END']
     else:
         kmstart = event['KM_END']
         kmend = event['KM_START']
-    return zip(kmstart, kmend)
+    return [kmstart, kmend]
 
 
 def missing_values_table(df):
@@ -57,8 +58,8 @@ print_info_about_dataset(weather,'WEATHER')
 speed = speed.drop('KEY_2', axis=1)
 speed['DATETIME_UTC'] = pd.to_datetime(speed['DATETIME_UTC'])
 check_missing_values(speed)
-speed = speed.set_index(['KEY','KM','DATETIME_UTC']) #primary key as index
-speed = speed.sort_index()
+#speed = speed.set_index(['KEY','KM','DATETIME_UTC']) #primary key as index
+#speed = speed.sort_index()
 print (speed.head(10))
 
 #2)events dataset
@@ -73,14 +74,14 @@ check_missing_values(events)  #==> 24 missing values on event detail
 #since the percentage of missing values is really small(<0.1%) ==> delete all the rows with mv
 events = events.dropna()
 print(events.info())
-events = events.set_index(['KEY'])
-events = events.sort_index()
+#events = events.set_index(['KEY'])
+#events = events.sort_index()
 print(events.head(10))
 
 #3)sensors dataset
 check_missing_values(sensors)
-sensors = sensors.set_index(['KEY','KM'])
-sensors = sensors.sort_index()
+#sensors = sensors.set_index(['KEY','KM'])
+#sensors = sensors.sort_index()
 print(sensors.head(10))
 
 #4)weather dataset
@@ -89,31 +90,51 @@ weather['DATETIME_UTC'] = pd.to_datetime(weather['DATETIME_UTC'])
 
 
 # merging speed and sensors datasets
-speed_sensors = speed.join(sensors).drop_duplicates()
+speed_sensors = speed.merge(sensors,on=['KEY', 'KM']).drop_duplicates()
+#speed_sensors = speed_sensors.set_index(['KEY','KM']).sort_index()
+
+print(speed_sensors.head(5))
+print(speed_sensors.info())
+speed_sensors['event1'] = None
+speed_sensors['event2'] = None
+speed_sensors['event3'] = None
+speed_sensors['event4'] = None
+
+for index_events, event in events.iterrows():
+    [kmstart, kmend] = check_start_end_km(event)
+    for index_speedsensors, speed_sensor in speed_sensors.iterrows():
+        if(event['KEY'] == speed_sensor['KEY']):
+            #SAME ROAD
+            if(speed_sensor['KM'] >= kmstart) & (speed_sensor['KM'] <= kmend):
+                #SAME KM INTERVAL
+                if (speed_sensor['DATETIME_UTC'].between(event['START_DATETIME_UTC'],event['END_DATETIME_UTC'], inclusive=True)):
+                    #SAME TIME INTERVAL
+                    if(speed_sensor['EVENT1'] == None): speed_sensor['EVENT1'] = event['EVENT_DETAIL']
+                    elif(speed_sensor['EVENT2'] == None): speed_sensor['EVENT2'] = event['EVENT_DETAIL']
+                    elif(speed_sensor['EVENT3'] == None): speed_sensor['EVENT3'] = event['EVENT_DETAIL']
+                    elif(speed_sensor['EVENT4'] == None): speed_sensor['EVENT4'] = event['EVENT_DETAIL']
 print(speed_sensors.head(5))
 print(speed_sensors.info())
 
-#merging speed_sensors with events dataset
-for event in events.iterrows():
-    [km_start, km_end] = set_km_start(event)
-    #to finish
 
+#merging speed_sensors with events dataset
+    
 '''
 # Avoiding duplicate columns
 events.rename(columns={'KEY': 'KEY_EVENTS', 'KEY_2': 'KEY_2_EVENTS'}, inplace=True)
 
 # The values to be compared.
 
-a = speed_sensors.KM.values
-bh = events.KM_END.values
-bl = events.KM_START.values
+a = speed_sensors['KM'].values
+bh = events['KM_END'].values
+bl = events['KM_START'].values
 
-aid = speed_sensors.KEY.values
-bid = events.KEY_EVENTS.values
+aid = speed_sensors['KEY'].values
+bid = events['KEY_EVENTS'].values
 
-at = speed_sensors.DATETIME_UTC.values
-btl = events.START_DATETIME_UTC.values
-bth = events.END_DATETIME_UTC.values
+at = speed_sensors['DATETIME_UTC'].values
+btl = events['START_DATETIME_UTC'].values
+bth = events['END_DATETIME_UTC'].values
 
 i, j = np.where(
     (aid[:, None] == bid) & (a[:, None] >= bl) & (a[:, None] <= bh) & (at[:, None] >= btl) & (at[:, None] <= bth))
@@ -132,7 +153,7 @@ print(merged.shape)
 
 print(merged.count().tail())
 
-print(missing_values_table(merged))
+#print(missing_values_table(merged))
 '''
 
 
