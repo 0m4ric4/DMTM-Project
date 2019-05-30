@@ -15,6 +15,15 @@ def print_info_about_dataset(dt,name):
 def check_missing_values(dt):
     print(dt.isnull().sum())
 
+def set_km_start(event):
+    if (event['KM_START'] >= event['KM_END']):
+        kmstart = event['KM_START']
+        kmend = event['KM_END']
+    else:
+        kmstart = event['KM_END']
+        kmend = event['KM_START']
+    return zip(kmstart, kmend)
+
 
 def missing_values_table(df):
     mis_val = df.isnull().sum()
@@ -51,19 +60,29 @@ check_missing_values(speed)
 speed = speed.set_index(['KEY','KM','DATETIME_UTC']) #primary key as index
 speed = speed.sort_index()
 print (speed.head(10))
+
 #2)events dataset
+#key 2 attribute is useless
 events = events.drop('KEY_2', axis=1)
+#event type is useless since we use event detail that is the same but remapped to int values
+events = events.drop('EVENT_TYPE', axis=1)
 events['START_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
 events['END_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
-check_missing_values(events)
+events['KEY'] = events['KEY'].astype('int64')
+check_missing_values(events)  #==> 24 missing values on event detail
+#since the percentage of missing values is really small(<0.1%) ==> delete all the rows with mv
+events = events.dropna()
+print(events.info())
 events = events.set_index(['KEY'])
 events = events.sort_index()
 print(events.head(10))
+
 #3)sensors dataset
 check_missing_values(sensors)
 sensors = sensors.set_index(['KEY','KM'])
 sensors = sensors.sort_index()
 print(sensors.head(10))
+
 #4)weather dataset
 check_missing_values(weather)
 weather['DATETIME_UTC'] = pd.to_datetime(weather['DATETIME_UTC'])
@@ -73,6 +92,11 @@ weather['DATETIME_UTC'] = pd.to_datetime(weather['DATETIME_UTC'])
 speed_sensors = speed.join(sensors).drop_duplicates()
 print(speed_sensors.head(5))
 print(speed_sensors.info())
+
+#merging speed_sensors with events dataset
+for event in events.iterrows():
+    [km_start, km_end] = set_km_start(event)
+    #to finish
 
 '''
 # Avoiding duplicate columns
