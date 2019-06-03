@@ -40,6 +40,13 @@ def missing_values_table(df):
           " columns that have missing values.")
     return mis_val_table_ren_columns
 
+def print_info_about_dataset(dt,name):
+    print(name)
+    print(dt.info())
+
+def check_missing_values(dt):
+    print(dt.isnull().sum())
+
 
 def chunk_preprocessing(speeds_chunk):
     # Down-casting the data types of some columns to 32-bit in order to reduce memory usage
@@ -97,11 +104,18 @@ def chunk_preprocessing(speeds_chunk):
 #                                                                                                                      #
 ########################################################################################################################
 
+SPEED_TRAIN_PATH = "C:\\Users\erica\Desktop\jacopo\progetto dmtm\speeds_train.csv.gz"
+SENSORS_PATH = "C:\\Users\erica\Desktop\jacopo\progetto dmtm\sensors.csv.gz"
+EVENT_TRAIN_PATH = "C:\\Users\erica\Desktop\jacopo\progetto dmtm\events_train.csv.gz"
+WEATHER_TRAIN_PATH = "C:\\Users\erica\Desktop\jacopo\progetto dmtm\weather_train.csv.gz"
+DISTANCES_PATH ="C:\\Users\erica\Desktop\jacopo\progetto dmtm\distances.csv.gz"
+PATH_TO_SAVE_THE_FINAL_DATASET = "C:\\Users\erica\Desktop\jacopo\progetto dmtm\dataset_final.csv"
 
-speed_chunks = pd.read_csv('speeds_train.csv.gz',
+
+speed_chunks = pd.read_csv(SPEED_TRAIN_PATH,
                            chunksize=150000)  # Specifying chunk size for the speed dataset to be 150,000 rows
-sensors = pd.read_csv('sensors.csv.gz')
-events = pd.read_csv('events_train.csv.gz')
+sensors = pd.read_csv(SENSORS_PATH)
+events = pd.read_csv(EVENT_TRAIN_PATH)
 
 events['START_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
 events['END_DATETIME_UTC'] = pd.to_datetime(events['END_DATETIME_UTC'])
@@ -109,6 +123,9 @@ events['END_DATETIME_UTC'] = pd.to_datetime(events['END_DATETIME_UTC'])
 events['KEY'] = events['KEY'].astype(np.int32)
 events['KM_END'] = events['KM_END'].astype(np.int32)
 events['KM_START'] = events['KM_START'].astype(np.int32)
+check_missing_values(events)  #==> 24 missing values on event detail
+#since the percentage of missing values is really small(<0.1%) ==> delete all the rows with mv
+events = events.dropna()
 
 # Avoiding duplicate columns
 events.rename(columns={'KEY': 'KEY_EVENTS', 'KEY_2': 'KEY_2_EVENTS'}, inplace=True)
@@ -169,7 +186,7 @@ dataset.sort_values(by=["KEY", "KM", "DATETIME_UTC"], inplace=True)
 
 
 # reading distances.csv.gz with '|' as the delimiter, with 2 columns (ColA and ColB)
-distances = pd.read_csv('distances.csv.gz', delimiter='|', names=['ColA', 'ColB'])
+distances = pd.read_csv(DISTANCES_PATH, delimiter='|', names=['ColA', 'ColB'])
 distances.dropna(inplace=True)
 
 # Creating an empty data-frame to store the nearest weather station with attributes (KEY_2 and ID)
@@ -211,7 +228,7 @@ for index, row in distances.iterrows():
 
 
 # Reading weather_train.csv.gz
-weather = pd.read_csv('weather_train.csv.gz')
+weather = pd.read_csv(WEATHER_TRAIN_PATH)
 
 # Converting DATETIME_UTC to datetime dtype
 dataset['DATETIME_UTC'] = pd.to_datetime(dataset['DATETIME_UTC'])
@@ -229,4 +246,4 @@ dataset_final = pd.merge_asof(df, weather, on='DATETIME_UTC', by='ID', direction
 dataset_final.sort_values(by=["KEY", "KM", "DATETIME_UTC"], inplace=True)
 
 # Exporting to dataset_final.csv
-dataset_final.to_csv('dataset_final.csv', encoding='utf-8', index=False)
+dataset_final.to_csv(PATH_TO_SAVE_THE_FINAL_DATASET, encoding='utf-8', index=False)

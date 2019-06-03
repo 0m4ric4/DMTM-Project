@@ -15,13 +15,8 @@ def data_exploration(dataset):
     print(dataset.isnull().sum())
     print(dataset.head(100))
 
-def data_preparation(dataset):
-    #convert the data into inputs and targets
-    inputs = []
-    targets = []
-
 #loading data
-full_dataset = pd.read_csv('C:\\Users\erica\Desktop\jacopo\progetto dmtm\\full_dataset.csv')
+full_dataset = pd.read_csv('C:\\Users\erica\Desktop\jacopo\progetto dmtm\\full_dataset_correct.csv')
 
 #delete useless columns in term of prediction
 full_dataset.drop('KEY',axis=1,inplace=True)
@@ -34,7 +29,5 @@ full_dataset.drop('MIN_TEMPERATURE',axis=1,inplace=True)
 full_dataset.drop('MAX_TEMPERATURE',axis=1,inplace=True)
 full_dataset['WEATHER'] = full_dataset['WEATHER'].astype('category').cat.codes
 
-data_exploration(full_dataset)
-
-
+full_dataset.to_csv('C:\\Users\erica\Desktop\jacopo\progetto dmtm\\full_dataset_after_preprocess.csv')
 

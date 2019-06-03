@@ -15,110 +15,24 @@ def print_info_about_dataset(dt,name):
 def check_missing_values(dt):
     print(dt.isnull().sum())
 
-
-def check_start_end_km(event):
-    if (event['KM_START'] <= event['KM_END']):
-        kmstart = event['KM_START']
-        kmend = event['KM_END']
-    else:
-        kmstart = event['KM_END']
-        kmend = event['KM_START']
-    return [kmstart, kmend]
-
-
-def missing_values_table(df):
-    mis_val = df.isnull().sum()
-    mis_val_percent = 100 * df.isnull().sum() / len(df)
-    mis_val_table = pd.concat([mis_val, mis_val_percent], axis=1)
-    mis_val_table_ren_columns = mis_val_table.rename(
-        columns={0: 'Missing Values', 1: '% of Total Values'})
-    mis_val_table_ren_columns = mis_val_table_ren_columns[
-        mis_val_table_ren_columns.iloc[:, 1] != 0].sort_values(
-        '% of Total Values', ascending=False).round(1)
-    print("Your selected dataframe has " + str(df.shape[1]) + " columns.\n"
-                                                              "There are " + str(mis_val_table_ren_columns.shape[0]) +
-          " columns that have missing values.")
-    return mis_val_table_ren_columns
-
 # loading data
-speed = pd.read_csv("C:\\Users\erica\Desktop\jacopo\progetto dmtm\speeds_train.csv.gz")
-weather = pd.read_csv("C:\\Users\erica\Desktop\jacopo\progetto dmtm\weather_train.csv.gz")
 events = pd.read_csv("C:\\Users\erica\Desktop\jacopo\progetto dmtm\events_train.csv.gz")
-sensors = pd.read_csv("C:\\Users\erica\Desktop\jacopo\progetto dmtm\sensors.csv.gz")
-
-
-####### Info about the datasets before merge #######
-print_info_about_dataset(speed,'SPEED')
-print_info_about_dataset(events,'EVENTS')
-print_info_about_dataset(sensors,'SENSORS')
-print_info_about_dataset(weather,'WEATHER')
-
-####### Pre-Processing ########
-#1)speed dataset
-speed = speed.drop('KEY_2', axis=1)
-speed['DATETIME_UTC'] = pd.to_datetime(speed['DATETIME_UTC'])
-check_missing_values(speed)
-#speed = speed.set_index(['KEY','KM','DATETIME_UTC']) #primary key as index
-#speed = speed.sort_index()
-print (speed.head(10))
 
 #2)events dataset
 #key 2 attribute is useless
 events = events.drop('KEY_2', axis=1)
-#event type is useless since we use event detail that is the same but remapped to int values
-events = events.drop('EVENT_TYPE', axis=1)
 events['START_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
 events['END_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
 events['KEY'] = events['KEY'].astype('int64')
 check_missing_values(events)  #==> 24 missing values on event detail
 #since the percentage of missing values is really small(<0.1%) ==> delete all the rows with mv
 events = events.dropna()
+events['EVENT_TYPE'] = events['EVENT_TYPE'] + events['EVENT_DETAIL'].map(str)
+print(events['EVENT_TYPE'].nunique())
 print(events.info())
 #events = events.set_index(['KEY'])
 #events = events.sort_index()
 print(events.head(10))
-
-#3)sensors dataset
-check_missing_values(sensors)
-#sensors = sensors.set_index(['KEY','KM'])
-#sensors = sensors.sort_index()
-print(sensors.head(10))
-
-#4)weather dataset
-check_missing_values(weather)
-weather['DATETIME_UTC'] = pd.to_datetime(weather['DATETIME_UTC'])
-
-
-# merging speed and sensors datasets
-speed_sensors = speed.merge(sensors,on=['KEY', 'KM']).drop_duplicates()
-#speed_sensors = speed_sensors.set_index(['KEY','KM']).sort_index()
-
-print(speed_sensors.head(5))
-print(speed_sensors.info())
-speed_sensors['event1'] = None
-speed_sensors['event2'] = None
-speed_sensors['event3'] = None
-speed_sensors['event4'] = None
-
-for index_events, event in events.iterrows():
-    [kmstart, kmend] = check_start_end_km(event)
-    for index_speedsensors, speed_sensor in speed_sensors.iterrows():
-        if(event['KEY'] == speed_sensor['KEY']):
-            #SAME ROAD
-            if(speed_sensor['KM'] >= kmstart) & (speed_sensor['KM'] <= kmend):
-                #SAME KM INTERVAL
-                if (speed_sensor['DATETIME_UTC'].between(event['START_DATETIME_UTC'],event['END_DATETIME_UTC'], inclusive=True)):
-                    #SAME TIME INTERVAL
-                    if(speed_sensor['EVENT1'] == None): speed_sensor['EVENT1'] = event['EVENT_DETAIL']
-                    elif(speed_sensor['EVENT2'] == None): speed_sensor['EVENT2'] = event['EVENT_DETAIL']
-                    elif(speed_sensor['EVENT3'] == None): speed_sensor['EVENT3'] = event['EVENT_DETAIL']
-                    elif(speed_sensor['EVENT4'] == None): speed_sensor['EVENT4'] = event['EVENT_DETAIL']
-print(speed_sensors.head(5))
-print(speed_sensors.info())
-
-
-#merging speed_sensors with events dataset
-    
 '''
 # Avoiding duplicate columns
 events.rename(columns={'KEY': 'KEY_EVENTS', 'KEY_2': 'KEY_2_EVENTS'}, inplace=True)
