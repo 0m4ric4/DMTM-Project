@@ -1,0 +1,15 @@
+EVENTO;TIPO
+Veicolo_in_avaria;int8
+Ostacolo_in_carreggiata;int8
+Regimazione_delle_acque;int8
+Manutenzione_opere_in_verde;int8
+Meteo;int8
+Gestione_viabilita;int8
+extended_accident;int8
+Segnaletica_orizzontale;int8
+Allarme;int8
+Segnaletica_verticale;int8
+Barriere;int8
+Pavimentazione;int8
+Opera_arte;int8
+Calamita_naturale;int8
