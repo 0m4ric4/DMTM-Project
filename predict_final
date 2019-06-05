@@ -202,9 +202,6 @@ trained_keys = []
 
 
 
-trained_keys = []
-
-
 for key in to_be_trained_keys:
 
     if(len(train_dfs[key].index) >=10):
