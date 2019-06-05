@@ -47,8 +47,13 @@ def print_info_about_dataset(dt,name):
 def check_missing_values(dt):
     print(dt.isnull().sum())
 
+def data_exploration(dataset):
+    print(dataset.info())
+    print(dataset.isnull().sum())
+    print(dataset.head(100))
 
-def chunk_preprocessing(speeds_chunk):
+
+def down_casting_data_types(speeds_chunk):
     # Down-casting the data types of some columns to 32-bit in order to reduce memory usage
     speeds_chunk['KM'] = speeds_chunk['KM'].astype(np.int32)
     speeds_chunk['KEY'] = speeds_chunk['KEY'].astype(np.int32)
@@ -57,14 +62,16 @@ def chunk_preprocessing(speeds_chunk):
     speeds_chunk['SPEED_MIN'] = speeds_chunk['SPEED_MIN'].astype(np.float32)
     speeds_chunk['SPEED_MAX'] = speeds_chunk['SPEED_MAX'].astype(np.float32)
     speeds_chunk['N_VEHICLES'] = speeds_chunk['N_VEHICLES'].astype(np.int32)
-    speeds_chunk['DATETIME_UTC'] = pd.to_datetime(speeds_chunk['DATETIME_UTC'])
+    return speeds_chunk
 
-    print(speeds_chunk.info())
 
+def merge_speed_and_sensors(speed_chunk, sensors):
     # Merging speeds.train.csv.gz with sensors.csv.gz
-    speeds_sensors = pd.merge(speeds_chunk, sensors, on=['KEY', 'KM']).drop_duplicates().reset_index(
+    speeds_sensors = pd.merge(speed_chunk, sensors, on=['KEY', 'KM']).drop_duplicates().reset_index(
         drop=True)
+    return speeds_sensors
 
+def merge_SpeedSensors_and_events(speeds_chunk,events):
     # Merging speeds_sensors with events_train.csv.gz
 
     sensor_km = speeds_sensors.KM.values
@@ -94,7 +101,6 @@ def chunk_preprocessing(speeds_chunk):
         speeds_sensors[~np.in1d(np.arange(len(speeds_sensors)), np.unique(i))],
         ignore_index=True, sort=False
     )
-
     return speeds_sensors_events
 
 
@@ -117,13 +123,16 @@ speed_chunks = pd.read_csv(SPEED_TRAIN_PATH,
 sensors = pd.read_csv(SENSORS_PATH)
 events = pd.read_csv(EVENT_TRAIN_PATH)
 
+#events preprocessing
+#cast dates
 events['START_DATETIME_UTC'] = pd.to_datetime(events['START_DATETIME_UTC'])
 events['END_DATETIME_UTC'] = pd.to_datetime(events['END_DATETIME_UTC'])
-# events['EVENT_DETAIL'] = events['EVENT_DETAIL'].astype(np.int32)
+events['EVENT_DETAIL'] = events['EVENT_DETAIL'].astype(np.int32)
 events['KEY'] = events['KEY'].astype(np.int32)
 events['KM_END'] = events['KM_END'].astype(np.int32)
 events['KM_START'] = events['KM_START'].astype(np.int32)
-check_missing_values(events)  #==> 24 missing values on event detail
+check_missing_values(events)
+#==> 24 missing values on event detail
 #since the percentage of missing values is really small(<0.1%) ==> delete all the rows with mv
 events = events.dropna()
 
@@ -132,20 +141,23 @@ events.rename(columns={'KEY': 'KEY_EVENTS', 'KEY_2': 'KEY_2_EVENTS'}, inplace=Tr
 
 chunk_list = []  # append each chunk df here
 
-# Each chunk is in df format
-
-i = 1
 for chunk in speed_chunks:
-    print("Processing chunk # " + str(i))
-    i = i + 1
-    # perform data pre-processing
-    chunk_processed = chunk_preprocessing(chunk)
+
+    chunk = down_casting_data_types(chunk)
+    chunk['DATETIME_UTC'] = pd.to_datetime(chunk['DATETIME_UTC'])
+    print(chunk.info())
+
+    # perform merging
+    speeds_sensors = merge_speed_and_sensors(chunk,sensors)
+    # perform merging
+    chunk_processed = merge_SpeedSensors_and_events(speeds_sensors,events)
 
     # Once the data processing is done, append the chunk to list
     chunk_list.append(chunk_processed)
 
 # concat the list into dataframe
 dataset = pd.concat(chunk_list)
+
 
 # Eliminating duplicate timestamps by appending concurrent events to a new column
 # Maximum concurrent events = 4
@@ -166,6 +178,7 @@ dataset.drop('KEY_2_EVENTS', axis=1, inplace=True)
 print(dataset.info())
 print(dataset.head(20))
 print('..')
+
 g = dataset.groupby(
     ["KEY", "DATETIME_UTC", "KM", "SPEED_AVG", "SPEED_SD", "SPEED_MIN", "SPEED_MAX", "N_VEHICLES", "KEY_2",
      "EMERGENCY_LANE",

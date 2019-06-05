@@ -28,6 +28,31 @@ for index,row in dataframe_dict.iterrows():
     dict[row['EVENTO']] = row['TIPO']
 print(dict)
 
-dataset = pd.read_csv(DATAFRAME_PATH,dtype=dict)
-data_exploration(dataset)
+def adding_ones(dataframe):
+    for index,row in dataframe.iterrows():
+        print(index)
+        for i in range(1,5):
+            if(row['EVENT_TYPE'] + str(i)) != "NO_EVENT":
+                event_type = row['EVENT_TYPE'] + str(i)
+                row[event_type] = np.int8(1)
+    return dataframe
 
+dataset = pd.read_csv(DATAFRAME_PATH,dtype=dict)
+dataset.drop('Unnamed: 0', axis=1,inplace=True)
+data_exploration(dataset)
+i = 0
+for key2, df_key2 in dataset.groupby('KEY_2'):
+    print(str(i) + ") " + key2)
+    df_key2.to_csv('C:\\Users\erica\Desktop\jacopo\progetto dmtm\\datasets\dataset_sensor_' + str(key2) + ".csv")
+    i +=1
+
+'''
+data_exploration(dataset)
+dataset['DATETIME_UTC'] = pd.to_datetime(dataset['DATETIME_UTC'])
+
+#one-hot-encoding the weather 
+dataframe_weather = pd.get_dummies(dataset['WEATHER'],prefix='WEATHER',dtype='int8')
+dataset.append(dataframe_weather)
+dataset.drop('WEATHER', axis=1,inplace=True)
+data_exploration(dataset)
+'''
