@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout, Activation
@@ -87,38 +89,20 @@ def missing_values_table(df):
     return mis_val_table_ren_columns
 
 
-dataframe_dict = pd.read_csv('dictionary.csv')
+dataframe_dict = pd.read_csv('dict_to_cast_events_when_loading.csv')
 dictionary = {}
 for index, row in dataframe_dict.iterrows():
     dictionary[row['EVENTO']] = row['TIPO']
 print(dictionary)
 
-train = pd.read_csv('train_4_june.csv.gz', dtype=dictionary)
-test = pd.read_csv('test_4_june.csv.gz', dtype=dictionary)
+train = pd.read_csv('train_final.csv', dtype=dictionary)
+test = pd.read_csv('test_2019_final.csv', dtype=dictionary)
 
 print(train.info())
 print(test.info())
 
 df_temp_train = train[['WEATHER']]
 df_temp_test = test[['WEATHER']]
-
-# df_temp_train['EVENTS'] = df_temp_train['EVENT_TYPE1']+df_temp_train['EVENT_TYPE2'] +df_temp_train['EVENT_TYPE3']+df_temp_train['EVENT_TYPE4']+df_temp_train['EVENT_TYPE5']
-
-
-print(df_temp_train.stack().unique())
-print(len(df_temp_train.stack().unique()))
-
-print("Train")
-print(df_temp_train.head(20))
-print(df_temp_train.info())
-
-print("Test")
-
-print(df_temp_test.head(20))
-print(df_temp_test.info())
-
-print(df_temp_train.stack().unique())
-print(len(df_temp_train.stack().unique()))
 
 df_temp_train['train'] = 1
 df_temp_test['train'] = 0
@@ -137,45 +121,31 @@ train_encoded.drop(['WEATHER'], axis=1, inplace=True)
 test_encoded.drop(['train'], axis=1, inplace=True)
 test_encoded.drop(['WEATHER'], axis=1, inplace=True)
 
-'''
-all_data = pd.concat((df_temp_train,df_temp_test))
-all_data.dropna(inplace=True)
 
-for column in all_data.select_dtypes(include=[np.object]).columns:
-    df_temp_train[column] = df_temp_train[column].astype('category', categories = all_data[column].unique())
-    df_temp_test[column] = df_temp_test[column].astype('category', categories = all_data[column].unique())
-
-#X_train = df_temp_train.drop(["EVENTS"], axis=1)
-train_encoded = pd.get_dummies(df_temp_train.astype(str))
-print(train_encoded)
-
-#X_test = df_temp_test.drop(["EVENTS"], axis=1)
-test_encoded = pd.get_dummies(df_temp_test.astype(str))
-
-'''
 print(train_encoded.info())
 print(test_encoded.info())
-print("..")
 
 print(test_encoded)
 
 train.drop('WEATHER', axis=1, inplace=True)
+train.drop('TEMPERATURE', axis=1, inplace=True)
+train.drop('MIN_TEMPERATURE', axis=1, inplace=True)
+train.drop('MAX_TEMPERATURE', axis=1, inplace=True)
 train.drop('ID', axis=1, inplace=True)
 train.drop('EVENT_TYPE1', axis=1, inplace=True)
 train.drop('EVENT_TYPE2', axis=1, inplace=True)
 train.drop('EVENT_TYPE3', axis=1, inplace=True)
 train.drop('EVENT_TYPE4', axis=1, inplace=True)
-# train.drop('EVENT_TYPE5', axis=1, inplace=True)
 train.drop('KEY', axis=1, inplace=True)
 train.drop('KM', axis=1, inplace=True)
 
 test.drop('WEATHER', axis=1, inplace=True)
+test.drop('TEMPERATURE', axis=1, inplace=True)
+test.drop('MIN_TEMPERATURE', axis=1, inplace=True)
+test.drop('MAX_TEMPERATURE', axis=1, inplace=True)
 test.drop('ID', axis=1, inplace=True)
 test.drop('EVENT_TYPE1', axis=1, inplace=True)
 test.drop('EVENT_TYPE2', axis=1, inplace=True)
-test.drop('EVENT_TYPE3', axis=1, inplace=True)
-test.drop('EVENT_TYPE4', axis=1, inplace=True)
-test.drop('EVENT_TYPE5', axis=1, inplace=True)
 test.drop('KEY', axis=1, inplace=True)
 test.drop('KM', axis=1, inplace=True)
 
@@ -193,18 +163,25 @@ test_dfs = dict(tuple(test.groupby('KEY_2')))
 
 result_df = pd.DataFrame(columns=['KEY', 'KM', 'DATETIME_UTC', 'PREDICTION_STEP', 'SPEED_AVG'])
 
-to_be_trained_keys = sorted(train_dfs)[:10]
+train_keys = sorted(train_dfs)
+test_keys = sorted(test_dfs)
+
+# We should only train keys that are present in both train and set sets
+to_be_trained_keys = list(set(train_keys) & set(test_keys))
+#sorts and removes duplicates
+to_be_trained_keys = list(OrderedDict.fromkeys(to_be_trained_keys))
+to_be_trained_keys = sorted(to_be_trained_keys)
+
+to_be_trained_keys = to_be_trained_keys[:10]
 
 print(to_be_trained_keys)
 print("Number of keys to be trained:" + str(len(to_be_trained_keys)))
 
 trained_keys = []
 
-
-
 for key in to_be_trained_keys:
 
-    if(len(train_dfs[key].index) >=10):
+    if (len(train_dfs[key].index) >= 10 and len(test_dfs[key].index) >= 10):
 
         trained_keys.append(key)
         train_df = train_dfs[key]
@@ -217,14 +194,9 @@ for key in to_be_trained_keys:
         test_df.set_index('DATETIME_UTC', inplace=True)
         test_df.drop('KEY_2', axis=1, inplace=True)
 
-        #train_df.to_csv('train_df_4_june.csv', encoding='utf-8', index=False)
-        #test_df.to_csv('test_df_4_june.csv', encoding='utf-8', index=False)
-
+       
         print(train_df.info())
-        print(train_df.head(20))
-
-        print(train_df.info())
-        print(train_df.head(20))
+        print(train_df.head(5))
 
         values_train = train_df.values
 
@@ -233,19 +205,16 @@ for key in to_be_trained_keys:
 
         # print(scaled_train.head())
 
-
         # test_df.set_index('DATETIME_UTC', inplace=True)
 
-
         print(test_df.info())
-        print(test_df.head(20))
+        print(test_df.head(5))
 
         values_test = test_df.values
 
         scaler = MinMaxScaler()
         scaled_test = scaler.fit_transform(values_test)
 
-        # print(scaled_test.head())
 
         timeSteps = 1
         ahead = 4
@@ -253,35 +222,24 @@ for key in to_be_trained_keys:
         supervised_train = series_to_supervised(scaled_train, n_in=timeSteps, n_out=ahead)
         supervised_test = series_to_supervised(scaled_test, n_in=timeSteps, n_out=ahead)
 
-        # df = supervised_train[supervised_train.columns.drop(list(supervised_train.filter(regex='Test')))]
-
 
         features_train = train_df.shape[1]
         features_test = test_df.shape[1]
 
-        '''
-        for i in range(0,timeSteps):
-            n = (features_train*2)+i
-            supervised_train.drop(supervised_train.columns[range(features_train+1, n)], axis=1, inplace=True)
-            supervised_test.drop(supervised_test.columns[range(features_train+1, n)], axis=1, inplace=True)
-        
-        '''
 
-        supervised_train.drop(supervised_train.columns[range(124, 246)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(125, 247)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(126, 248)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(127, 249)], axis=1, inplace=True)
-        # supervised_train.drop(supervised_train.columns[range(171,340)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(57, 112)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(58, 113)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(59, 114)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(60, 115)], axis=1, inplace=True)
 
-        supervised_test.drop(supervised_test.columns[range(124, 246)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(125, 247)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(126, 248)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(127, 249)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(57, 112)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(58, 113)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(59, 114)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(60, 115)], axis=1, inplace=True)
 
         supervised_train = supervised_train.values
         supervised_test = supervised_test.values
-        # X_train = supervised_train[:, :-ahead]
-        # y_train = supervised_train[:, -ahead:-1]
+      
 
         X_train = supervised_train[:, :features_train * timeSteps]
         y_train = supervised_train[:, features_train * timeSteps:]
@@ -296,9 +254,9 @@ for key in to_be_trained_keys:
 
         print(X_train.shape, X_test.shape)
 
-        NUM_NEURONS_FirstLayer = 100
-        NUM_NEURONS_SecondLayer = 50
-        EPOCHS = 50
+        NUM_NEURONS_FirstLayer = 80
+        NUM_NEURONS_SecondLayer = 60
+        EPOCHS = 15
 
         # Build the model
         model = Sequential()
@@ -308,35 +266,28 @@ for key in to_be_trained_keys:
         model.add(Dense(ahead))
         model.compile(loss='mean_squared_error', optimizer='adam')
 
-        history = model.fit(X_train, y_train, epochs=EPOCHS, shuffle=True, batch_size=32,
+        history = model.fit(X_train, y_train, epochs=EPOCHS, shuffle=True, batch_size=24,
                             verbose=2)
 
-        '''
-        plt.plot(history.history['loss'], label='train')
-        plt.plot(history.history['val_loss'], label='test')
-        plt.legend()
-        plt.yticks([])
-        plt.xticks([])
-        plt.title("loss during training")
-        plt.show()
-        '''
 
         y_pred = model.predict(X_test)
         X_test = X_test.reshape(X_test.shape[0], X_test.shape[2] * X_test.shape[1])
 
         y_true = []
+        y_predicted = []
         for i in range(0, ahead):
             y_pred_i = y_pred[:, i]
             y_pred_i = y_pred_i.reshape(y_test.shape[0], 1)
 
-            inv_new = np.concatenate((y_pred_i, X_test[:, -122:]), axis=1)
+            inv_new = np.concatenate((y_pred_i, X_test[:, -55:]), axis=1)
             inv_new = scaler.inverse_transform(inv_new)
             final_pred = inv_new[:, 0]
+            y_predicted.append(final_pred)
 
             y_test_i = y_test[:, i]
             y_test_i = y_test_i.reshape(len(y_test_i), 1)
 
-            inv_new = np.concatenate((y_test_i, X_test[:, -122:]), axis=1)
+            inv_new = np.concatenate((y_test_i, X_test[:, -55:]), axis=1)
             inv_new = scaler.inverse_transform(inv_new)
             actual_pred = inv_new[:, 0]
 
@@ -356,26 +307,21 @@ for key in to_be_trained_keys:
             print("mean squared error:")
             print(mean_squared_error(final_pred, actual_pred))
 
-        temp_df = pd.DataFrame(columns=['KEY', 'KM', 'DATETIME_UTC','PREDICTION_STEP','SPEED_AVG'])
+        temp_df = pd.DataFrame(columns=['KEY', 'KM', 'DATETIME_UTC', 'PREDICTION_STEP', 'SPEED_AVG'])
 
         i = 0
-        for index,row in test_df.iterrows():
+        for index, row in test_df.tail(-ahead).iterrows():
 
+            # index is datetime
 
-            if(row['SPEED_AVG']==y_true[0][i]):
+            for j in range(0, ahead):
+                print(key.split('_')[0], key.split('_')[1], index, str(j + 1), y_predicted[j][i])
+                temp_df.loc[i+j] = [key.split('_')[0]] + [key.split('_')[1]] + [str(index)] + [str(j+1)] + [str(y_predicted[j][i])]
 
-                for j in range(0, ahead):
-                    print(key.split('_')[0], key.split('_')[1], index, str(j + 1), y_true[j][i])
-
-                temp_df.loc[i] = [key.split('_')[0]] + [key.split('_')[1]] + [index] + [str(j + 1)] + [y_true[j][i]]
-                i += 1
+            i += 1
             result_df.append(temp_df)
-
 
 print(trained_keys)
 
+result_df.to_csv('results.csv', encoding='utf-8', index=False)
 
-
-
-print("...")
-# pd.DataFrame(supervised).head()
