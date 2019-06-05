@@ -193,9 +193,14 @@ test_dfs = dict(tuple(test.groupby('KEY_2')))
 
 result_df = pd.DataFrame(columns=['KEY', 'KM', 'DATETIME_UTC', 'PREDICTION_STEP', 'SPEED_AVG'])
 
-to_be_trained_keys = list(train_dfs.keys())
-to_be_trained_keys = to_be_trained_keys[:len(to_be_trained_keys)/4]
+to_be_trained_keys = sorted(train_dfs)[:10]
+
+print(to_be_trained_keys)
 print("Number of keys to be trained:" + str(len(to_be_trained_keys)))
+
+trained_keys = []
+
+
 
 trained_keys = []
 
