@@ -316,7 +316,7 @@ for key in to_be_trained_keys:
 
             for j in range(0, ahead):
                 print(key.split('_')[0], key.split('_')[1], index, str(j + 1), y_predicted[j][i])
-                temp_df.loc[i+j] = [key.split('_')[0]] + [key.split('_')[1]] + [str(index)] + [str(j+1)] + [str(y_predicted[j][i])]
+                temp_df.at[i+j] = [key.split('_')[0]] + [key.split('_')[1]] + [str(index)] + [str(j+1)] + [str(y_predicted[j][i])]
 
             i += 1
             result_df.append(temp_df)
