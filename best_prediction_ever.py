@@ -1,6 +1,8 @@
 from collections import OrderedDict
 
-from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder, StandardScaler
+from keras import optimizers
 from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout, Activation
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -121,7 +123,6 @@ train_encoded.drop(['WEATHER'], axis=1, inplace=True)
 test_encoded.drop(['train'], axis=1, inplace=True)
 test_encoded.drop(['WEATHER'], axis=1, inplace=True)
 
-
 print(train_encoded.info())
 print(test_encoded.info())
 
@@ -168,11 +169,11 @@ test_keys = sorted(test_dfs)
 
 # We should only train keys that are present in both train and set sets
 to_be_trained_keys = list(set(train_keys) & set(test_keys))
-#sorts and removes duplicates
+# sorts and removes duplicates
 to_be_trained_keys = list(OrderedDict.fromkeys(to_be_trained_keys))
 to_be_trained_keys = sorted(to_be_trained_keys)
 
-to_be_trained_keys = to_be_trained_keys[:1]
+to_be_trained_keys = to_be_trained_keys[200:225]
 
 print(to_be_trained_keys)
 print("Number of keys to be trained:" + str(len(to_be_trained_keys)))
@@ -181,7 +182,9 @@ trained_keys = []
 
 for key in to_be_trained_keys:
 
-    if (len(train_dfs[key].index) >= 10 and len(test_dfs[key].index) >= 10):
+    if (len(train_dfs[key].index) >= 5 and len(test_dfs[key].index) >= 5):
+
+        print('Training sensor: ' + str(key))
 
         trained_keys.append(key)
         train_df = train_dfs[key]
@@ -194,27 +197,31 @@ for key in to_be_trained_keys:
         test_df.set_index('DATETIME_UTC', inplace=True)
         test_df.drop('KEY_2', axis=1, inplace=True)
 
-       
-        print(train_df.info())
-        print(train_df.head(5))
+        # print(train_df.info())
+        # print(train_df.head(5))
 
         values_train = train_df.values
 
-        scaler = MinMaxScaler()
+        scaler = StandardScaler()
         scaled_train = scaler.fit_transform(values_train)
 
         # print(scaled_train.head())
 
         # test_df.set_index('DATETIME_UTC', inplace=True)
 
-        print(test_df.info())
-        print(test_df.head(5))
+        # print(test_df.info())
+        # print(test_df.head(5))
 
         values_test = test_df.values
 
-        scaler = MinMaxScaler()
+        scaler = StandardScaler()
         scaled_test = scaler.fit_transform(values_test)
 
+        pca = PCA(n_components=20)
+        scaled_train = pca.fit_transform(scaled_train)
+        scaled_test = pca.transform(scaled_test)
+
+        explained_variance = pca.explained_variance_ratio_
 
         timeSteps = 1
         ahead = 4
@@ -222,24 +229,21 @@ for key in to_be_trained_keys:
         supervised_train = series_to_supervised(scaled_train, n_in=timeSteps, n_out=ahead)
         supervised_test = series_to_supervised(scaled_test, n_in=timeSteps, n_out=ahead)
 
+        features_train = 20
+        features_test = 20
 
-        features_train = train_df.shape[1]
-        features_test = test_df.shape[1]
+        supervised_train.drop(supervised_train.columns[range(21, 40)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(22, 41)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(23, 42)], axis=1, inplace=True)
+        supervised_train.drop(supervised_train.columns[range(24, 43)], axis=1, inplace=True)
 
-
-        supervised_train.drop(supervised_train.columns[range(57, 112)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(58, 113)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(59, 114)], axis=1, inplace=True)
-        supervised_train.drop(supervised_train.columns[range(60, 115)], axis=1, inplace=True)
-
-        supervised_test.drop(supervised_test.columns[range(57, 112)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(58, 113)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(59, 114)], axis=1, inplace=True)
-        supervised_test.drop(supervised_test.columns[range(60, 115)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(21, 40)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(22, 41)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(23, 42)], axis=1, inplace=True)
+        supervised_test.drop(supervised_test.columns[range(24, 43)], axis=1, inplace=True)
 
         supervised_train = supervised_train.values
         supervised_test = supervised_test.values
-      
 
         X_train = supervised_train[:, :features_train * timeSteps]
         y_train = supervised_train[:, features_train * timeSteps:]
@@ -247,16 +251,17 @@ for key in to_be_trained_keys:
         X_test = supervised_test[:, :features_test * timeSteps]
         y_test = supervised_test[:, features_test * timeSteps:]
 
-        print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+        # print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
 
         X_train = X_train.reshape(X_train.shape[0], timeSteps, features_train)
         X_test = X_test.reshape(X_test.shape[0], timeSteps, features_test)
 
-        print(X_train.shape, X_test.shape)
+        # print(X_train.shape, X_test.shape)
 
         NUM_NEURONS_FirstLayer = 80
-        NUM_NEURONS_SecondLayer = 60
-        EPOCHS = 15
+        NUM_NEURONS_SecondLayer = 50
+
+        EPOCHS = 30
 
         # Build the model
         model = Sequential()
@@ -264,12 +269,14 @@ for key in to_be_trained_keys:
         model.add(LSTM(NUM_NEURONS_SecondLayer, input_shape=(NUM_NEURONS_FirstLayer, 1)))
 
         model.add(Dense(ahead))
-        model.compile(loss='mean_squared_error', optimizer='adam')
+        sgd = optimizers.SGD(lr=0.1, decay=1e-6, momentum=0.9, nesterov=True)
 
-        history = model.fit(X_train, y_train, epochs=EPOCHS, shuffle=True, batch_size=24,
+        model.compile(loss='mae', optimizer=sgd)
+
+        history = model.fit(X_train, y_train, epochs=EPOCHS, shuffle=True, batch_size=32,
                             verbose=2)
 
-
+        model.save('model_' + str(key) + '.h5')
         y_pred = model.predict(X_test)
         X_test = X_test.reshape(X_test.shape[0], X_test.shape[2] * X_test.shape[1])
 
@@ -279,16 +286,16 @@ for key in to_be_trained_keys:
             y_pred_i = y_pred[:, i]
             y_pred_i = y_pred_i.reshape(y_test.shape[0], 1)
 
-            inv_new = np.concatenate((y_pred_i, X_test[:, -55:]), axis=1)
-            inv_new = scaler.inverse_transform(inv_new)
+            inv_new = np.concatenate((y_pred_i, X_test[:, -19:]), axis=1)
+            inv_new = scaler.inverse_transform(pca.inverse_transform(inv_new))
             final_pred = inv_new[:, 0]
             y_predicted.append(final_pred)
 
             y_test_i = y_test[:, i]
             y_test_i = y_test_i.reshape(len(y_test_i), 1)
 
-            inv_new = np.concatenate((y_test_i, X_test[:, -55:]), axis=1)
-            inv_new = scaler.inverse_transform(inv_new)
+            inv_new = np.concatenate((y_test_i, X_test[:, -19:]), axis=1)
+            inv_new = scaler.inverse_transform(pca.inverse_transform(inv_new))
             actual_pred = inv_new[:, 0]
 
             y_true.append(actual_pred)
@@ -316,12 +323,12 @@ for key in to_be_trained_keys:
             # index is datetime
             k = test_df_truncated.index.get_loc(index)
             for j in range(0, ahead):
-                print(key.split('_')[0], key.split('_')[1], index, str(j + 1), y_predicted[j][k])
-                temp_df.loc[i+j] = [key.split('_')[0]] + [key.split('_')[1]] + [str(index)] + [str(j+1)] + [str(y_predicted[j][k])]
-            i+=4
+                # print(key.split('_')[0], key.split('_')[1], index, str(j + 1), y_predicted[j][k])
+                temp_df.loc[i + j] = [key.split('_')[0]] + [key.split('_')[1]] + [str(index)] + [str(j + 1)] + [
+                    str(y_predicted[j][k])]
+            i += 4
         result_df = result_df.append(temp_df)
-
 
 print(trained_keys)
 
-result_df.to_csv('results_omar.csv', encoding='utf-8', index=False)
+result_df.to_csv('results_new_test.csv', encoding='utf-8', index=False)
