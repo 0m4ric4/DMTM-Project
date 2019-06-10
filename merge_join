@@ -1,0 +1,40 @@
+import pandas as pd
+
+
+eval = pd.read_csv('eval.csv')
+part_1 = pd.read_csv('1.csv')
+part_2 = pd.read_csv('2.csv')
+part_3 = pd.read_csv('3.csv')
+part_4 = pd.read_csv('4.csv')
+part_5 = pd.read_csv('5.csv')
+part_6 = pd.read_csv('6.csv')
+part_7 = pd.read_csv('7.csv')
+
+print(part_1.info())
+print(part_2.info())
+print(part_3.info())
+print(part_4.info())
+print(part_5.info())
+print(part_6.info())
+print(part_7.info())
+
+
+appended = part_1.append(part_2).append(part_3).append(part_4).append(part_5).append(part_6).append(part_7)
+
+appended['DATETIME_UTC'] = pd.to_datetime(appended['DATETIME_UTC'])
+eval['DATETIME_UTC'] = pd.to_datetime(eval['DATETIME_UTC'])
+
+print(appended.info())
+
+appended.to_csv('merged.csv',encoding='utf-8',index=False)
+
+joined = pd.merge(appended,eval,how='inner',on=['KEY','KM','DATETIME_UTC','PREDICTION_STEP'])
+
+print("Joined: ")
+print(joined.info())
+
+print("Evaluation: ")
+print(eval.info())
+
+joined.to_csv('submission.csv',encoding='utf-8',index=False)
+
